@@ -29,6 +29,8 @@ public final class ModelenBootstrap {
         }
         ModelenPanel.start(activeConfig);
         ModelenRestartSchedule.register();
+        ModelenBackup.registerScheduler();
+        System.out.println("[Modelen] Tum ozellikler aktif: panel=" + activeConfig.panelEnabled + ", restartTimes=" + activeConfig.restartTimes + ", backupTimes=" + activeConfig.backupTimes);
     }
 
     public static ModelenConfig config() {

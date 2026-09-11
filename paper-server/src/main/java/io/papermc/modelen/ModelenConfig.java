@@ -15,6 +15,8 @@ public final class ModelenConfig {
     public int panelPort;
     public String backupDir;
     public List<? extends String> restartTimes;
+    public List<? extends String> backupTimes;
+    public int keepBackups;
     public boolean wizardCompleted;
     public String preset;
     public int players;
@@ -30,6 +32,8 @@ public final class ModelenConfig {
             this.config.set("panel.enabled", true);
             this.config.set("panel.port", 8080);
             this.config.set("backup.directory", "backups");
+            this.config.set("backup.times", java.util.List.of());
+            this.config.set("backup.keep-last", 14);
             this.config.set("restart.times", java.util.List.of());
             this.config.set("wizard.completed", false);
             this.config.set("preset.name", "unset");
@@ -41,6 +45,8 @@ public final class ModelenConfig {
         this.panelEnabled = panel == null || panel.getBoolean("enabled", true);
         this.panelPort = panel != null ? panel.getInt("port", 8080) : 8080;
         this.backupDir = this.config.getString("backup.directory", "backups");
+        this.backupTimes = this.config.getStringList("backup.times");
+        this.keepBackups = this.config.getInt("backup.keep-last", 14);
         this.restartTimes = this.config.getStringList("restart.times");
         this.wizardCompleted = this.config.getBoolean("wizard.completed", false);
         this.preset = this.config.getString("preset.name", "unset");

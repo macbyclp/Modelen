@@ -18,7 +18,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 public final class ModelenCommand extends Command {
-    public static final String USAGE = "/modelen <status|backup|install|restart|help>";
+    public static final String USAGE = "/modelen <status|preset|backup|install|restart|help>";
 
     protected ModelenCommand() {
         super("modelen");
@@ -36,6 +36,30 @@ public final class ModelenCommand extends Command {
         final String sub = args.length == 0 ? "help" : args[0].toLowerCase();
         switch (sub) {
             case "status" -> this.status(sender);
+            case "wizard", "preset" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("[Modelen] Kullanim: /modelen preset <smp|minigame|skyblock|anarchy> [oyuncu]");
+                    sender.sendMessage("[Modelen] Hazir tur: smp, minigame, skyblock, anarchy. Ayarlar restart sonrasi tamamen devreye girer.");
+                    return true;
+                }
+                final String preset = ModelenPreset.normalize(args[1]);
+                int players = 20;
+                if (args.length >= 3) {
+                    try {
+                        players = Integer.parseInt(args[2]);
+                    } catch (final NumberFormatException e) {
+                        players = 20;
+                    }
+                }
+                if (!ModelenPreset.VALID.contains(preset)) {
+                    sender.sendMessage("[Modelen] Gecersiz preset: " + args[1]);
+                    return true;
+                }
+                for (final String note : ModelenPreset.apply(preset, players, ModelenBootstrap.config())) {
+                    sender.sendMessage("[Modelen] " + note);
+                }
+                sender.sendMessage("[Modelen] modelen.yml isaretlendi. Cesitli world ayarlari yeniden baslatmada tam uygulanir.");
+            }
             case "backup" -> {
                 sender.sendMessage("[Modelen] Yedekleme baslatiliyor...");
                 ModelenBackup.start();

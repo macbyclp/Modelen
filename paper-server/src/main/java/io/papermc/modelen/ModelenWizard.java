@@ -57,20 +57,24 @@ public final class ModelenWizard {
             System.out.println("[Modelen] EULA kabul edilmedi. Sunucu acilmadan once 'eula.txt' dosyasinda eula=true olmali.");
         }
 
-        this.applyPreset(typedefined(type), players);
-
-        System.out.println();
-        System.out.println("[Modelen] Kurulum tamamlandi!");
-        System.out.println("[Modelen] - Sunucu turu: " + type + ", oyuncu kapasitesi: " + players);
-        System.out.println("[Modelen] Web panel: " + (panel.startsWith("e") ? "acik (http://127.0.0.1:" + this.config.panelPort + ")" : "kapali"));
-        System.out.println("[Modelen] Kullanilabilir komutlar: /modelen status, /modelen backup, /modelen install <plugin>, /modelen restart, /modelen help");
-        System.out.println();
-        this.config.setWizardResult(typedefined(type), players);
+        final String preset = ModelenPreset.normalize(type);
+        for (final String note : ModelenPreset.apply(preset, players, this.config)) {
+            System.out.println("[Modelen] " + note);
+        }
+        this.config.setWizardResult(preset, players);
 
         if (!panel.startsWith("e")) {
             this.config.panelEnabled = false;
             this.config.save();
         }
+
+        System.out.println();
+        System.out.println("[Modelen] Kurulum tamamlandi!");
+        System.out.println("[Modelen] - Sunucu turu: " + preset + ", oyuncu kapasitesi: " + players);
+        System.out.println("[Modelen] Web panel: " + (panel.startsWith("e") ? "acik (http://127.0.0.1:" + this.config.panelPort + ")" : "kapali"));
+        System.out.println("[Modelen] Kullanilabilir komutlar: /modelen status, /modelen preset, /modelen backup, /modelen install <plugin>, /modelen restart, /modelen help");
+        System.out.println("[Modelen] Ayarlarin tamami bir sonraki yeniden baslatmada etkili olur.");
+        System.out.println();
     }
 
     private String readLine(final Scanner scanner, final String def) {
@@ -94,29 +98,5 @@ public final class ModelenWizard {
         } catch (final java.io.IOException e) {
             System.out.println("[Modelen] eula.txt yazilamadi: " + e.getMessage());
         }
-    }
-
-    private void applyPreset(String preset, final int players) {
-        preset = typedefined(preset);
-        switch (preset) {
-            case "skyblock", "anarchy" -> {
-                this.config.players = players;
-            }
-            case "minigame" -> {
-                this.config.players = players;
-            }
-            default -> {
-                this.config.players = players;
-            }
-        }
-    }
-
-    private static String typedefined(final String t) {
-        return switch (t) {
-            case "minigame" -> "minigame";
-            case "skyblock" -> "skyblock";
-            case "anarchy" -> "anarchy";
-            default -> "smp";
-        };
     }
 }

@@ -7,10 +7,38 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import org.bukkit.Bukkit;
 
 public final class ModelenBackup {
     private ModelenBackup() {}
+
+    public static void registerScheduler() {
+        for (final String t : ModelenBootstrap.config().backupTimes) {
+            schedule(t);
+        }
+    }
+
+    private static void schedule(final String hhmm) {
+        try {
+            final String[] parts = hhmm.split(":");
+            final int hh = Integer.parseInt(parts[0]);
+            final int mm = Integer.parseInt(parts[1]);
+            final java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            java.time.LocalDateTime next = now.toLocalDate().atTime(hh, mm);
+            if (!next.isAfter(now)) {
+                next = next.plusDays(1);
+            }
+            final long delayMs = java.time.Duration.between(now, next).toMinutes() * 60 * 1000;
+            final java.util.Timer timer = new java.util.Timer("Modelen-Backup", true);
+            timer.schedule(new java.util.TimerTask() {
+                @Override public void run() {
+                    System.out.println("[Modelen] Planli yedekleme basliyor (" + hhmm + ")...");
+                    start();
+                }
+            }, delayMs, 24L * 60 * 60 * 1000);
+        } catch (final Exception e) {
+            System.out.println("[Modelen] Yedek saati gecersiz: " + hhmm + " (" + e.getMessage() + ")");
+        }
+    }
 
     public static void start() {
         final Thread t = new Thread(ModelenBackup::run, "Modelen-Backup");
@@ -30,9 +58,27 @@ public final class ModelenBackup {
                 addWorld(zip, new File("world_the_end"));
             }
             System.out.println("[Modelen] Yedek tamamlandi: " + out.getAbsolutePath() + " (" + Math.round(out.length() / 1024.0 / 1024.0 * 10) / 10.0 + " MB)");
+            prune(dir);
         } catch (final Exception e) {
             System.out.println("[Modelen] Yedekleme hata verdi: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private static void prune(final File dir) {
+        final int keep = ModelenBootstrap.config().keepBackups;
+        if (keep <= 0) {
+            return;
+        }
+        final File[] backups = dir.listFiles((d, name) -> name.startsWith("modelen-backup-") && name.endsWith(".zip"));
+        if (backups == null || backups.length <= keep) {
+            return;
+        }
+        java.util.Arrays.sort(backups, java.util.Comparator.comparingLong(File::lastModified));
+        for (int i = 0; i < backups.length - keep; i++) {
+            if (backups[i].delete()) {
+                System.out.println("[Modelen] Eski yedek silindi: " + backups[i].getName());
+            }
         }
     }
 
