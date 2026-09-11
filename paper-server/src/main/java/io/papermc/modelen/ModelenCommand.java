@@ -18,7 +18,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 public final class ModelenCommand extends Command {
-    public static final String USAGE = "/modelen <status|preset|bundle|world|player|report|backup|install|restart|help>";
+    public static final String USAGE = "/modelen <status|preset|bundle|world|player|report|backup|install|restart|update|help>";
 
     protected ModelenCommand() {
         super("modelen");
@@ -83,6 +83,13 @@ public final class ModelenCommand extends Command {
                     return true;
                 }
                 ModelenBundle.install(sender, args[1]);
+            }
+            case "update" -> {
+                if (args.length >= 2 && args[1].equalsIgnoreCase("download")) {
+                    ModelenUpdate.download(sender);
+                } else {
+                    ModelenUpdate.check(sender);
+                }
             }
             case "restart" -> {
                 if (args.length >= 2 && args[1].equalsIgnoreCase("now")) {
