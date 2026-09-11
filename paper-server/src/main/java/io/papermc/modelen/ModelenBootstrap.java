@@ -29,6 +29,7 @@ public final class ModelenBootstrap {
             System.out.println("[Modelen] Komut kaydi basarisiz: " + t.getMessage());
         }
         ModelenPanel.start(activeConfig);
+        ModelenStats.start();
         ModelenRestartSchedule.register();
         ModelenBackup.registerScheduler();
         System.out.println("[Modelen] Tum ozellikler aktif: panel=" + activeConfig.panelEnabled + ", restartTimes=" + activeConfig.restartTimes + ", backupTimes=" + activeConfig.backupTimes);

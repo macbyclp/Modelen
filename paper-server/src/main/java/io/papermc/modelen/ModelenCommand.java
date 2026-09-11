@@ -18,7 +18,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 public final class ModelenCommand extends Command {
-    public static final String USAGE = "/modelen <status|preset|bundle|world|player|backup|install|restart|help>";
+    public static final String USAGE = "/modelen <status|preset|bundle|world|player|report|backup|install|restart|help>";
 
     protected ModelenCommand() {
         super("modelen");
@@ -35,6 +35,7 @@ public final class ModelenCommand extends Command {
         }
         final String sub = args.length == 0 ? "help" : args[0].toLowerCase();
         switch (sub) {
+            case "report" -> ModelenStats.report(sender);
             case "world" -> ModelenWorld.handle(sender, args);
             case "player" -> ModelenWorld.playerInfo(sender, args);
             case "status" -> this.status(sender);
