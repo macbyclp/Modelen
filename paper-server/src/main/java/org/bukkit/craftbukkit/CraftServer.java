@@ -479,6 +479,7 @@ public final class CraftServer implements Server {
         this.potionBrewer = new io.papermc.paper.potion.PaperPotionBrewer(console); // Paper - custom potion mixes
         datapackManager = new io.papermc.paper.datapack.PaperDatapackManager(console.getPackRepository()); // Paper
         this.spark = new io.papermc.paper.SparksFly(this); // Paper - spark
+        io.papermc.modelen.ModelenBootstrap.init(this); // Modelen - onboarding, panel and management tools
     }
 
     public boolean getCommandBlockOverride(String command) {
