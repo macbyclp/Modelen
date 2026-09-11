@@ -18,6 +18,7 @@ public final class ModelenBootstrap {
         started = true;
         System.out.println("[Modelen] Baslatiliyor (Paper tabanli, " + MinecraftVersion() + " uyumlu)...");
         activeConfig = new ModelenConfig(new File("."));
+        ModelenLang.init(activeConfig);
         if (!activeConfig.wizardCompleted) {
             new ModelenWizard(activeConfig).runIfNeeded();
         }

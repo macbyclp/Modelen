@@ -13,6 +13,10 @@ public final class ModelenConfig {
 
     public boolean panelEnabled;
     public int panelPort;
+    public String panelPassword;
+    public double tpsAlarmThreshold;
+    public int tpsAlarmCooldownMin;
+    public String locale;
     public String backupDir;
     public List<? extends String> restartTimes;
     public List<? extends String> backupTimes;
@@ -31,6 +35,10 @@ public final class ModelenConfig {
             this.config = new YamlConfiguration();
             this.config.set("panel.enabled", true);
             this.config.set("panel.port", 8080);
+            this.config.set("panel.password", "");
+            this.config.set("locale", "tr");
+            this.config.set("alarm.tps-threshold", 15.0);
+            this.config.set("alarm.cooldown-minutes", 10);
             this.config.set("backup.directory", "backups");
             this.config.set("backup.times", java.util.List.of());
             this.config.set("backup.keep-last", 14);
@@ -45,6 +53,10 @@ public final class ModelenConfig {
         this.panelEnabled = panel == null || panel.getBoolean("enabled", true);
         this.panelPort = panel != null ? panel.getInt("port", 8080) : 8080;
         this.backupDir = this.config.getString("backup.directory", "backups");
+        this.panelPassword = this.config.getString("panel.password", "");
+        this.locale = this.config.getString("locale", "tr");
+        this.tpsAlarmThreshold = this.config.getDouble("alarm.tps-threshold", 15.0);
+        this.tpsAlarmCooldownMin = this.config.getInt("alarm.cooldown-minutes", 10);
         this.backupTimes = this.config.getStringList("backup.times");
         this.keepBackups = this.config.getInt("backup.keep-last", 14);
         this.restartTimes = this.config.getStringList("restart.times");

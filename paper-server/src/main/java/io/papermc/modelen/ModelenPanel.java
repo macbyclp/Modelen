@@ -23,6 +23,9 @@ public final class ModelenPanel extends AbstractAppender {
 
     private final java.util.Deque<String> logBuffer = new java.util.concurrent.ConcurrentLinkedDeque<>();
     private HttpServer server;
+    private ModelenConfig config;
+    private volatile boolean alerting;
+    private volatile long lastAlertMs;
 
     private ModelenPanel() {
         super("ModelenPanel", null, null, true, org.apache.logging.log4j.core.config.Property.EMPTY_ARRAY);
@@ -33,6 +36,7 @@ public final class ModelenPanel extends AbstractAppender {
             return;
         }
         final ModelenPanel panel = new ModelenPanel();
+        panel.config = config;
         final Logger root = (Logger) LogManager.getRootLogger();
         root.addAppender(panel);
         try {
@@ -42,10 +46,52 @@ public final class ModelenPanel extends AbstractAppender {
             panel.server.createContext("/api/log", panel::handleLog);
             panel.server.setExecutor(null);
             panel.server.start();
-            System.out.println("[Modelen] Web panel active: http://127.0.0.1:" + config.panelPort);
+            System.out.println("[Modelen] Web panel active: http://127.0.0.1:" + config.panelPort
+                + (config.panelPassword.isEmpty() ? " (auth kapali - sadece localhost)" : " (sifre korumali)"));
+            panel.startAlarmWatcher(config);
         } catch (final Exception e) {
             System.out.println("[Modelen] Web panel could not start: " + e.getMessage());
         }
+    }
+
+    private void startAlarmWatcher(final ModelenConfig cfg) {
+        final java.util.concurrent.ScheduledExecutorService exec = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            final Thread t = new Thread(r, "Modelen-Alarm");
+            t.setDaemon(true);
+            return t;
+        });
+        exec.scheduleAtFixedRate(() -> {
+            try {
+                final double tps = ModelenBootstrap.tps5s();
+                if (tps < cfg.tpsAlarmThreshold && (System.nanoTime() - START) > 300_000_000_000L) {
+                    final long now = System.currentTimeMillis();
+                    if (now - this.lastAlertMs > cfg.tpsAlarmCooldownMin * 60_000L) {
+                        this.lastAlertMs = now;
+                        this.alerting = true;
+                        System.out.println("[Modelen ALARM] TPS 5s ortalama " + String.format("%.1f", tps)
+                            + " seviyesine dustu (esik: " + cfg.tpsAlarmThreshold + "). Sebip analizi icin /modelen status ve panel yazisina bakin.");
+                    }
+                } else if (tps >= cfg.tpsAlarmThreshold + 1.0) {
+                    if (this.alerting) {
+                        this.alerting = false;
+                        System.out.println("[Modelen] TPS normale dondu (" + String.format("%.1f", tps) + ").");
+                    }
+                }
+            } catch (final Throwable ignored) {
+            }
+        }, 30, 5, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
+    private boolean authorized(final HttpExchange exchange) {
+        if (this.config == null || this.config.panelPassword.isEmpty()) {
+            return true;
+        }
+        final String header = exchange.getRequestHeaders().getFirst("X-Modelen-Token");
+        if (this.config.panelPassword.equals(header)) {
+            return true;
+        }
+        final String q = exchange.getRequestURI().getQuery();
+        return q != null && q.contains("token=" + this.config.panelPassword);
     }
 
     @Override
@@ -60,6 +106,16 @@ public final class ModelenPanel extends AbstractAppender {
 
     private void handleRoot(final HttpExchange exchange) {
         try {
+            if (this.config != null && !this.config.panelPassword.isEmpty() && !this.authorized(exchange)) {
+                final String login = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Modelen Panel - Giris</title></head><body style='font-family:sans-serif;background:#111;color:#ddd'>"
+                    + "<div style='max-width:320px;margin:80px auto'><h1>Modelen Panel</h1>"
+                    + "<input id='p' type='password' placeholder='Panel sifresi' style='width:100%;padding:10px'>"
+                    + "<button onclick='go()' style='width:100%;padding:10px;margin-top:8px'>Giris</button></div>"
+                    + "<script>function go(){sessionStorage.setItem('mtok',document.getElementById('p').value);"
+                    + "location.href='/';}</script></body></html>";
+                this.send(exchange, "text/html; charset=utf-8", login.getBytes(StandardCharsets.UTF_8));
+                return;
+            }
             final String html = pageTemplate();
             this.send(exchange, "text/html; charset=utf-8", html.getBytes(StandardCharsets.UTF_8));
         } catch (final Exception e) {
@@ -69,7 +125,13 @@ public final class ModelenPanel extends AbstractAppender {
 
     private void handleStatus(final HttpExchange exchange) {
         try {
-            final MinecraftServer server = MinecraftServer.getServer();
+            if (!this.authorized(exchange)) {
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                try (OutputStream os = exchange.getResponseBody()) {
+                    exchange.sendResponseHeaders(401, -1);
+                }
+                return;
+            }
             final double mspt = mspt5s();
             final double tps = Math.min(20.0, 1000.0 / Math.max(mspt, 0.001));
             int plugins = 0;
@@ -82,6 +144,7 @@ public final class ModelenPanel extends AbstractAppender {
                 + ",\"mspt\":" + limit(mspt)
                 + ",\"players\":" + Bukkit.getOnlinePlayers().size()
                 + ",\"plugins\":" + plugins
+                + ",\"alert\":" + this.alerting
                 + ",\"uptimeMs\":" + ((System.nanoTime() - START) / 1_000_000)
                 + "}";
             this.send(exchange, "application/json", json.getBytes(StandardCharsets.UTF_8));
@@ -92,6 +155,13 @@ public final class ModelenPanel extends AbstractAppender {
 
     private void handleLog(final HttpExchange exchange) {
         try {
+            if (!this.authorized(exchange)) {
+                exchange.getResponseHeaders().set("Content-Type", "text/plain");
+                try (OutputStream os = exchange.getResponseBody()) {
+                    exchange.sendResponseHeaders(401, -1);
+                }
+                return;
+            }
             final StringBuilder sb = new StringBuilder();
             final List<String> lines = new ArrayList<>(this.logBuffer);
             for (final String line : lines) {
@@ -117,6 +187,7 @@ public final class ModelenPanel extends AbstractAppender {
             + "<div><span class='num' id='tps'>-</span><span class='num' id='mspt'>-</span>"
             + "<span class='num' id='players'>-</span><span class='num' id='plugins'>-</span>"
             + "<span class='num' id='uptime'>-</span></div>"
+            + "<div id='alert' style='display:none;background:#7a1010;color:#ffdede;padding:12px;border-radius:8px;margin:12px 0'>ALERT: Dusuk TPS algilandi!</div>"
             + "<canvas id='chart' width='800' height='160'></canvas>"
             + "<h3>Log (son 300 satir)</h3><pre id='log'></pre>"
             + "<script>"
@@ -130,15 +201,21 @@ public final class ModelenPanel extends AbstractAppender {
             + "hist.forEach((v,i)=>{const x=i*step;const y=c.height-30-(v/20)*(c.height-40);"
             + "i==0?ctx.moveTo(x,y):ctx.lineTo(x,y);});"
             + "ctx.stroke();ctx.fillStyle='#888';ctx.fillText('20 TPS',4,14);ctx.fillText('0',4,c.height-16);}"
+            + "const TOK=(()=>{const q=new URLSearchParams(location.search).get('token');"
+            + "if(q){sessionStorage.setItem('mtok',q);history.replaceState({},'','/');return q;}"
+            + "return sessionStorage.getItem('mtok')||'';})();"
+            + "const Q=TOK?('?token='+encodeURIComponent(TOK)):'';"
             + "async function tick(){"
-            + "const r=await fetch('/api/status');const j=await r.json();"
+            + "const r=await fetch('/api/status'+Q);if(r.status==401){location.reload();return;}"
+            + "const j=await r.json();"
             + "document.getElementById('tps').textContent='TPS '+j.tps.toFixed(1);"
             + "document.getElementById('mspt').textContent='MSPT '+j.mspt.toFixed(1);"
             + "document.getElementById('players').textContent='Oyuncu '+j.players;"
             + "document.getElementById('plugins').textContent='Plugin '+j.plugins;"
             + "document.getElementById('uptime').textContent='Calisma '+fmt(j.uptimeMs);"
+            + "const a=document.getElementById('alert');a.style.display=j.alert?'block':'none';"
             + "hist.push(j.tps);if(hist.length>100)hist.shift();draw();"
-            + "const l=await fetch('/api/log');document.getElementById('log').textContent=await l.text();"
+            + "const l=await fetch('/api/log'+Q);document.getElementById('log').textContent=await l.text();"
             + "}setInterval(tick,2000);tick();"
             + "</script></body></html>";
     }
