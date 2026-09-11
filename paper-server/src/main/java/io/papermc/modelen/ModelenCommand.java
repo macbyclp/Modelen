@@ -18,7 +18,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 public final class ModelenCommand extends Command {
-    public static final String USAGE = "/modelen <status|preset|backup|install|restart|help>";
+    public static final String USAGE = "/modelen <status|preset|bundle|world|player|backup|install|restart|help>";
 
     protected ModelenCommand() {
         super("modelen");
@@ -35,6 +35,8 @@ public final class ModelenCommand extends Command {
         }
         final String sub = args.length == 0 ? "help" : args[0].toLowerCase();
         switch (sub) {
+            case "world" -> ModelenWorld.handle(sender, args);
+            case "player" -> ModelenWorld.playerInfo(sender, args);
             case "status" -> this.status(sender);
             case "wizard", "preset" -> {
                 if (args.length < 2) {
@@ -74,6 +76,13 @@ public final class ModelenCommand extends Command {
                 final String query = args[1];
                 Bukkit.getAsyncScheduler().runNow(null, task -> ModelenCommand.install(sender, query));
             }
+            case "bundle" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("[Modelen] Kullanim: /modelen bundle <smp|minigame|skyblock|anarchy>");
+                    return true;
+                }
+                ModelenBundle.install(sender, args[1]);
+            }
             case "restart" -> {
                 if (args.length >= 2 && args[1].equalsIgnoreCase("now")) {
                     ModelenRestartSchedule.restartNow(sender);
@@ -84,9 +93,13 @@ public final class ModelenCommand extends Command {
             default -> {
                 sender.sendMessage("[Modelen] Komutlar:");
                 sender.sendMessage("  /modelen status            - TPS/MSPT/oyuncu/uptime ozeti");
+                sender.sendMessage("  /modelen preset <tur>      - SMP/minigame/skyblock/anarchy profili");
+                sender.sendMessage("  /modelen world <list|create|delete|tp> - Dunya yonetimi");
+                sender.sendMessage("  /modelen player <isim>     - Oyuncu ozet bilgisi");
+                sender.sendMessage("  /modelen bundle <smp|skyblock|minigame> - Hazir plugin paketi kurulumu");
                 sender.sendMessage("  /modelen backup            - Dunyalari yedekle (arka plan)");
                 sender.sendMessage("  /modelen install <plugin>  - Hangar'dan plugin indir");
-                sender.sendMessage("  /modelen restart now       - Kaydet ve sunucuyu durdur (restart scripti ile sarmalanmali)");
+                sender.sendMessage("  /modelen restart now       - Kaydet ve sunucuyu durdur");
             }
         }
         return true;
@@ -114,7 +127,7 @@ public final class ModelenCommand extends Command {
 
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
-    private static void install(final CommandSender sender, final String query) {
+    static void install(final CommandSender sender, final String query) {
         try {
             final String searchUrl = "https://hangar.papermc.io/api/v1/projects/search?limit=1&query=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
             final HttpResponse<String> search = request(searchUrl);
